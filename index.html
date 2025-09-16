@@ -454,18 +454,99 @@
       }
     }
 
-    function formatDate(dateStr) {
-      if (!dateStr) return "";
-      const date = new Date(dateStr);
-      return date.toLocaleString("id-ID", {
-        day: "2-digit",
-        month: "2-digit",
-        year: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit"
-      });
+// ------------------------
+// Fungsi parsing fleksibel
+// ------------------------
+function parseFlexibleDate(input) {
+  if (input === null || input === undefined || input === "") return null;
+
+  // langsung kembalikan jika sudah object Date
+  if (input instanceof Date) {
+    return isNaN(input.getTime()) ? null : input;
+  }
+
+  const s = String(input).trim();
+
+  // angka murni: bisa epoch (s atau ms) atau excel serial
+  if (/^-?\d+(\.\d+)?$/.test(s)) {
+    const n = Number(s);
+
+    // kemungkinan timestamp milliseconds (>= ~1e12)
+    if (n > 1e12) return new Date(n);
+
+    // kemungkinan timestamp seconds (>= ~1e9)
+    if (n > 1e9) return new Date(n * 1000);
+
+    // kemungkinan Excel / Google Sheets serial (hari sejak 1899-12-30)
+    // catatan: ini asumsi umum; jika sheet Anda pakai serial berbeda sesuaikan.
+    if (n > 59) {
+      const excelEpoch = new Date(Date.UTC(1899, 11, 30)); // 1899-12-30
+      return new Date(excelEpoch.getTime() + Math.round(n) * 86400000);
     }
+  }
+
+  // coba Date.parse langsung (ISO, "2025-09-15T12:02:38", "2025-09-15 12:02:38", dsb)
+  const tryIso = Date.parse(s);
+  if (!isNaN(tryIso)) return new Date(tryIso);
+
+  // pola umum angka/garis miring: dd/mm/yyyy OR mm/dd/yyyy, dengan optional time
+  const m = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})(?:\s+(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?$/);
+  if (m) {
+    const a = Number(m[1]); // part1
+    const b = Number(m[2]); // part2
+    const y = Number(m[3]);
+    const hh = Number(m[4]||0), mmn = Number(m[5]||0), ss = Number(m[6]||0);
+
+    // heuristik: jika part1 > 12 pasti dd/mm (day-first)
+    // jika part2 > 12 pasti mm/dd (month-first -> part1 is month)
+    // kalau keduanya <=12 => default ke dd/mm (karena locale ID)
+    let day, month;
+    if (a > 12 && b <= 12) {
+      day = a; month = b;
+    } else if (b > 12 && a <= 12) {
+      month = a; day = b;
+    } else {
+      // ambigu: asumsikan dd/mm (Indonesia)
+      day = a; month = b;
+    }
+
+    const dateObj = new Date(y, month - 1, day, hh, mmn, ss);
+    if (!isNaN(dateObj.getTime())) return dateObj;
+    // fallback: coba kebalik
+    const alt = new Date(y, a - 1, b, hh, mmn, ss);
+    if (!isNaN(alt.getTime())) return alt;
+  }
+
+  // coba format teks seperti "Sep 15, 2025 12:02:38" atau "15 Sep 2025 12:02:38"
+  const tryText = new Date(s);
+  if (!isNaN(tryText.getTime())) return tryText;
+
+  // gagal parse
+  return null;
+}
+
+// ------------------------
+// Fungsi format untuk UI
+// ------------------------
+function formatDate(dateStr) {
+  if (dateStr === null || dateStr === undefined || dateStr === "") return "";
+
+  const d = parseFlexibleDate(dateStr);
+  if (!d) {
+    // kembalikan nilai asli (bukan "Invalid Date") supaya Anda bisa lihat apa yang dikirim dari sheet
+    return String(dateStr);
+  }
+  return d.toLocaleString("id-ID", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit"
+  });
+}
+
+
 
     function displayTable() {
       const tableBody = document.querySelector("#dataTable tbody");
@@ -578,7 +659,6 @@
   </script>
 </body>
 </html>
-
 
 
 
