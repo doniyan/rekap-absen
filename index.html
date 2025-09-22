@@ -486,7 +486,7 @@
   </div>
 
   <script>
-    const scriptURL = "https://script.google.com/macros/s/AKfycbyDDXTywvxWTMtmzIxGSMqU6NRaudMoC5gV_x2RaOWGpmMY4IbdmW2sp_xZF-SN8F-0/exec"; // ganti dengan URL Web App
+    const scriptURL = "https://script.google.com/macros/s/AKfycbzKmvhL16TwpugeYcuwzMVK6lUxxCGr7gW_U2wnK-TSz-80UoAweuouPoTT_Nzsr7AB/exec"; // ganti dengan URL Web App
     let allData = [];
     let filteredData = [];
     let currentPage = 1;
@@ -506,16 +506,22 @@
 
         const res = await fetch(scriptURL);
         const data = await res.json();
-        allData = data.map(d => {
-          return {
-            Timestamp: formatDate(d.Timestamp),
-            Nama: d.Nama,
-            "Kode Siswa": d["Kode Siswa"],
-            Kelas: d.Kelas,
-            Tipe: d.Tipe,
-            Status: d.Status
-          };
-        });
+       
+
+allData = data.map(d => {
+  return {
+    Timestamp: formatDate(d.Timestamp),
+    Nama: d.Nama.trim(),
+    NIS: String(d.NIS).trim(),
+    Kelas: d.Kelas.trim(),
+    Tipe: d.Tipe.trim(),
+    Status: d.Status.trim()
+  };
+});
+
+
+
+
         filteredData = [...allData];
     displayTable();
       
@@ -656,7 +662,7 @@ function formatDate(dateStr) {
         tr.innerHTML = `
           <td data-label="Tanggal & Waktu">${row.Timestamp}</td>
           <td data-label="Nama"><strong>${row.Nama}</strong></td>
-          <td data-label="Kode Siswa"><code>${row["Kode Siswa"]}</code></td>
+          <td data-label="Kode Siswa"><code>${row["NIS"]}</code></td>
           <td data-label="Kelas"><span class="type-badge">${row.Kelas}</span></td>
           <td data-label="Tipe"><span class="type-badge">${row.Tipe}</span></td>
           <td data-label="Status"><span class="status-badge">${row.Status}</span></td>
@@ -788,11 +794,13 @@ function formatDate(dateStr) {
       const nama = document.getElementById("namaFilter").value.toLowerCase();
       const kelas = document.getElementById("kelasFilter").value;
 
+
       filteredData = allData.filter(d =>
-        (!nis || String(d["Kode Siswa"]).toLowerCase().includes(nis)) &&
-        (!nama || d.Nama.toLowerCase().includes(nama)) &&
-        (!kelas || d.Kelas === kelas)
-      );
+  (!nis || d.NIS.toLowerCase().includes(nis)) &&
+  (!nama || d.Nama.toLowerCase().includes(nama)) &&
+  (!kelas || d.Kelas === kelas)
+);
+
 
       currentPage = 1;
       displayTable();
