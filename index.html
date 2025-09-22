@@ -194,14 +194,57 @@
       color: #4a5568;
     }
 
-    .pagination {
+    /* IMPROVED PAGINATION STYLES */
+    .pagination-wrapper {
       padding: 30px;
-      display: flex;
-      justify-content: center;
-      gap: 8px;
-      flex-wrap: wrap;
       border-top: 1px solid #e2e8f0;
       background: #f8fafc;
+    }
+
+    .pagination-controls {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+      gap: 15px;
+    }
+
+    .rows-per-page {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 14px;
+      color: #4a5568;
+    }
+
+    .rows-per-page select {
+      padding: 8px 12px;
+      border: 2px solid #e2e8f0;
+      border-radius: 8px;
+      background: white;
+      font-size: 14px;
+      outline: none;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+
+    .rows-per-page select:focus {
+      border-color: #667eea;
+      box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+
+    .pagination-info {
+      font-size: 14px;
+      color: #64748b;
+      font-weight: 500;
+    }
+
+    .pagination {
+      display: flex;
+      justify-content: center;
+      gap: 6px;
+      flex-wrap: wrap;
     }
 
     .pagination button {
@@ -217,20 +260,35 @@
       display: flex;
       align-items: center;
       justify-content: center;
+      font-size: 14px;
     }
 
-    .pagination button:hover:not(:disabled) {
+    .pagination button:hover:not(:disabled):not(.current) {
       background: #667eea;
       color: white;
       border-color: #667eea;
       transform: translateY(-1px);
     }
 
-    .pagination button:disabled {
+    .pagination button:disabled,
+    .pagination button.current {
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
       color: white;
       border-color: #667eea;
-      cursor: not-allowed;
+      cursor: default;
+      transform: none;
+    }
+
+    .pagination button.ellipsis {
+      border: none;
+      background: none;
+      cursor: default;
+      color: #94a3b8;
+      font-weight: 400;
+    }
+
+    .pagination button.ellipsis:hover {
+      background: none;
       transform: none;
     }
 
@@ -279,6 +337,21 @@
         padding: 0;
       }
 
+      .pagination-wrapper {
+        padding: 20px;
+      }
+
+      .pagination-controls {
+        flex-direction: column;
+        align-items: stretch;
+        text-align: center;
+      }
+
+      .pagination button {
+        min-width: 44px;
+        height: 44px;
+      }
+
       table, thead, tbody, th, td, tr {
         display: block;
       }
@@ -316,15 +389,6 @@
         color: #4a5568;
         margin-right: 8px;
         min-width: 100px;
-      }
-
-      .pagination {
-        padding: 20px;
-      }
-
-      .pagination button {
-        min-width: 44px;
-        height: 44px;
       }
     }
 
@@ -401,7 +465,23 @@
         </table>
       </div>
 
-      <div class="pagination" id="pagination"></div>
+      <div class="pagination-wrapper">
+        <div class="pagination-controls">
+          <div class="rows-per-page">
+            <label for="rowsPerPageSelect">Tampilkan:</label>
+            <select id="rowsPerPageSelect" onchange="changeRowsPerPage()">
+              <option value="10">10 data</option>
+              <option value="20">20 data</option>
+              <option value="50">50 data</option>
+              <option value="100">100 data</option>
+            </select>
+          </div>
+          
+          <div class="pagination-info" id="paginationInfo"></div>
+        </div>
+        
+        <div class="pagination" id="pagination"></div>
+      </div>
     </div>
   </div>
 
@@ -410,7 +490,7 @@
     let allData = [];
     let filteredData = [];
     let currentPage = 1;
-    const rowsPerPage = 10;
+    let rowsPerPage = 10;
 
     async function fetchData() {
       try {
@@ -548,8 +628,6 @@ function formatDate(dateStr) {
   });
 }
 
-
-
     function displayTable() {
       const tableBody = document.querySelector("#dataTable tbody");
       tableBody.innerHTML = "";
@@ -565,6 +643,7 @@ function formatDate(dateStr) {
           </tr>
         `;
         document.getElementById("pagination").innerHTML = "";
+        document.getElementById("paginationInfo").innerHTML = "";
         return;
       }
 
@@ -586,6 +665,7 @@ function formatDate(dateStr) {
       });
 
       setupPagination();
+      updatePaginationInfo();
     }
 
     function setupPagination() {
@@ -597,7 +677,8 @@ function formatDate(dateStr) {
 
       // Previous button
       const prevBtn = document.createElement("button");
-      prevBtn.innerHTML = "← Prev";
+      prevBtn.innerHTML = "‹";
+      prevBtn.title = "Halaman sebelumnya";
       prevBtn.disabled = currentPage === 1;
       prevBtn.addEventListener("click", () => {
         if (currentPage > 1) {
@@ -607,11 +688,46 @@ function formatDate(dateStr) {
       });
       pagination.appendChild(prevBtn);
 
+      // Smart pagination logic - hanya tampilkan nomor halaman yang relevan
+      const delta = 2; // jumlah halaman sebelum dan sesudah current page
+      let startPage = Math.max(1, currentPage - delta);
+      let endPage = Math.min(totalPages, currentPage + delta);
+
+      // Adjust jika terlalu dekat dengan ujung
+      if (endPage - startPage < 2 * delta) {
+        if (currentPage - 1 < delta) {
+          endPage = Math.min(totalPages, startPage + 2 * delta);
+        } else if (totalPages - currentPage < delta) {
+          startPage = Math.max(1, endPage - 2 * delta);
+        }
+      }
+
+      // First page + ellipsis
+      if (startPage > 1) {
+        const firstBtn = document.createElement("button");
+        firstBtn.innerText = "1";
+        firstBtn.addEventListener("click", () => {
+          currentPage = 1;
+          displayTable();
+        });
+        pagination.appendChild(firstBtn);
+
+        if (startPage > 2) {
+          const ellipsis = document.createElement("button");
+          ellipsis.innerHTML = "...";
+          ellipsis.classList.add("ellipsis");
+          pagination.appendChild(ellipsis);
+        }
+      }
+
       // Page numbers
-      for (let i = 1; i <= totalPages; i++) {
+      for (let i = startPage; i <= endPage; i++) {
         const btn = document.createElement("button");
         btn.innerText = i;
-        btn.disabled = i === currentPage;
+        if (i === currentPage) {
+          btn.classList.add("current");
+          btn.disabled = true;
+        }
         btn.addEventListener("click", () => {
           currentPage = i;
           displayTable();
@@ -619,9 +735,28 @@ function formatDate(dateStr) {
         pagination.appendChild(btn);
       }
 
+      // Last page + ellipsis
+      if (endPage < totalPages) {
+        if (endPage < totalPages - 1) {
+          const ellipsis = document.createElement("button");
+          ellipsis.innerHTML = "...";
+          ellipsis.classList.add("ellipsis");
+          pagination.appendChild(ellipsis);
+        }
+
+        const lastBtn = document.createElement("button");
+        lastBtn.innerText = totalPages;
+        lastBtn.addEventListener("click", () => {
+          currentPage = totalPages;
+          displayTable();
+        });
+        pagination.appendChild(lastBtn);
+      }
+
       // Next button
       const nextBtn = document.createElement("button");
-      nextBtn.innerHTML = "Next →";
+      nextBtn.innerHTML = "›";
+      nextBtn.title = "Halaman berikutnya";
       nextBtn.disabled = currentPage === totalPages;
       nextBtn.addEventListener("click", () => {
         if (currentPage < totalPages) {
@@ -630,6 +765,22 @@ function formatDate(dateStr) {
         }
       });
       pagination.appendChild(nextBtn);
+    }
+
+    function updatePaginationInfo() {
+      const totalItems = filteredData.length;
+      const startItem = (currentPage - 1) * rowsPerPage + 1;
+      const endItem = Math.min(currentPage * rowsPerPage, totalItems);
+      
+      document.getElementById("paginationInfo").innerHTML = 
+        `Menampilkan ${startItem}-${endItem} dari ${totalItems} data`;
+    }
+
+    function changeRowsPerPage() {
+      const select = document.getElementById("rowsPerPageSelect");
+      rowsPerPage = parseInt(select.value);
+      currentPage = 1; // Reset ke halaman pertama
+      displayTable();
     }
 
     function applyFilters() {
@@ -661,7 +812,3 @@ function formatDate(dateStr) {
   </script>
 </body>
 </html>
-
-
-
-
